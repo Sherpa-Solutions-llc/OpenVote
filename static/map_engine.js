@@ -33,7 +33,39 @@ async function initMap() {
             .atmosphereColor('lightskyblue')
             .atmosphereAltitude(0.15)
             .pointOfView({ lat: 39.8, lng: -98.5, altitude: 2 }) // default view
-            
+            .htmlElementsData([])
+            .htmlElement(d => {
+                const el = document.createElement('div');
+                el.className = 'globe-scoreboard';
+                
+                let title = d.poll.title || "Live Results";
+                let totalVotes = d.poll.options.reduce((sum, opt) => sum + (opt.weightedVotes || opt.votes || 0), 0);
+                if (totalVotes === 0) totalVotes = 1;
+
+                let optionsHtml = '';
+                // Sort by top 2 options
+                let sortedOptions = [...d.poll.options].sort((a,b) => (b.weightedVotes||b.votes||0) - (a.weightedVotes||a.votes||0)).slice(0,2);
+                
+                sortedOptions.forEach(opt => {
+                    let v = opt.weightedVotes || opt.votes || 0;
+                    let pct = ((v / totalVotes) * 100).toFixed(1);
+                    optionsHtml += `
+                        <div class="score-row">
+                            <span style="color: ${opt.color}; font-weight: 600;">${opt.name}</span>
+                            <span>${pct}% (${v.toLocaleString()})</span>
+                        </div>
+                        <div class="score-bar-bg">
+                            <div class="score-bar-fill" style="width: ${pct}%; background: ${opt.color};"></div>
+                        </div>
+                    `;
+                });
+
+                el.innerHTML = `
+                    <h4>${title}</h4>
+                    ${optionsHtml}
+                `;
+                return el;
+            });
         // Setup arcs state (telemetry paths)
         myGlobe.arcsData([])
                .arcColor('color')
@@ -123,6 +155,32 @@ function updateMapForPoll() {
     // Clear geometry
     myGlobe.ringsData([]);
     myGlobe.arcsData([]);
+    
+    // Update HTML overlay scoreboard
+    let markerLat = 39.8;
+    let markerLng = -98.5;
+    
+    if (poll.region === "US") {
+        if (poll.title) {
+            for (const [st, cd] of Object.entries(coords)) {
+                if (poll.title.includes(st)) {
+                    markerLat = cd.lat;
+                    markerLng = cd.lng;
+                    break;
+                }
+            }
+        }
+    } else if (poll.region === "UK") {
+        markerLat = 54.5; markerLng = -2.5;
+    } else if (poll.region === "France") {
+        markerLat = 46.5; markerLng = 2.5;
+    }
+    
+    myGlobe.htmlElementsData([{
+        lat: markerLat,
+        lng: markerLng,
+        poll: poll
+    }]);
 }
 
 function triggerGlobalPulse() {
